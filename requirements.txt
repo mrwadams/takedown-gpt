@@ -1,5 +1,5 @@
-tldextract==3.4.4
-whois==0.9.7
-langchain==0.1.0
-openai==0.27.0
-pydantic==1.9.0
+tldextract==3.4.1
+python-whois==0.8.0
+langchain==0.0.204
+openai==0.27.4
+pydantic==1.10.6
