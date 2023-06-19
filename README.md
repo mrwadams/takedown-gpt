@@ -19,7 +19,7 @@ Created by [Matt Adams](https://www.linkedin.com/in/matthewrwadams/).
 1. Clone this repository:
 
 ```bash
-git clone https://github.com/your-username/takedown-gpt.git
+git clone https://github.com/mrwadamstakedown-gpt.git
 cd takedown-gpt
 ```
 
