@@ -3,7 +3,7 @@ from typing import Optional, Type
 import streamlit as st
 import tldextract
 import whois
-from langchain import OpenAI
+import whoisit
 from langchain.agents import AgentType, Tool, initialize_agent
 from langchain.chat_models import ChatOpenAI
 from langchain.tools import BaseTool
@@ -37,7 +37,7 @@ st.sidebar.header("About 🌐")
 st.sidebar.markdown("""
 This app helps you draft takedown requests to domain registrars.
 It uses a combination of autonomous LangChain Agents and OpenAI's recently introduced support for function calling to:
-  1. Perform a WHOIS lookup to identify the registrar for the given website
+  1. Perform a WHOIS / RDAP lookup to identify the registrar for the given website
   2. Search the web with DuckDuckGo to find the appropriate email address for takedown requests for that domain registrar
   3. Draft a takedown request email to the hosting provider citing the reason for the takedown request
 
@@ -45,7 +45,7 @@ Created by [Matt Adams](https://www.linkedin.com/in/matthewrwadams/).
 """)
 
 # Domain input field
-domain = st.text_input("Enter the domain name for which you want to send a takedown request:", help="e.g. 'example.com'")
+domain = st.text_input("Enter the domain that is the subject of the takedown request:", help="e.g. 'example.com'")
 
 # Takedown reason drop-down field
 reason_options = [
@@ -67,6 +67,21 @@ else:
 
 # Additional information input field
 additional_info = st.text_area("Provide additional information to support your request (optional):", help="This information will be included in the takedown request email.")
+
+# Advanced Options collapsible menu
+advanced_options = st.expander("Advanced Options ⚙️")
+
+# Add protocol options for performing domain lookups
+lookup_options = [
+    "WHOIS",
+    "RDAP"
+]
+selected_lookup = advanced_options.selectbox("Select your preferred protocol for domain registrar lookups:", lookup_options)
+
+if selected_lookup == "RDAP":
+    tool_name = "rdap_lookup"
+else:
+    tool_name = "get_registrar"
 
 # Check if domain is valid
 def is_valid_domain(domain):
@@ -96,17 +111,32 @@ if st.button("Generate Takedown Request 📨"):
         # Initialize DuckDuckGo Search
         search = DuckDuckGoSearchRun()
 
-        # Define a custom tool
+        # Define a custom tool for WHOIS lookups
         class GetRegistrarCheckInput(BaseModel):
             domain: str = Field(..., description="The domain name to look up")
 
         class GetRegistrarTool(BaseTool):
             name = "get_registrar"
-            description = "Useful for finding the registrar of a given domain name"
+            description = "Useful for finding the registrar of a given domain name using WHOIS"
 
             def _run(self, domain: str):
                 w = whois.whois(domain)
                 return w.registrar
+
+            def _arun(self, domain: str):
+                raise NotImplementedError("This tool does not support async")
+
+            args_schema: Optional[Type[BaseModel]] = GetRegistrarCheckInput
+
+        # Define a custom tool for RDAP lookups
+        class RDAPLookupTool(BaseTool):
+            name = "rdap_lookup"
+            description = "Useful for finding the registrar of a given domain name using RDAP"
+
+            def _run(self, domain: str):
+                whoisit.bootstrap()
+                results = whoisit.domain(domain)
+                return results
 
             def _arun(self, domain: str):
                 raise NotImplementedError("This tool does not support async")
@@ -120,7 +150,8 @@ if st.button("Generate Takedown Request 📨"):
                 func=search.run,
                 description="useful for when you need to find web pages. You should ask targeted questions"
             ),
-            GetRegistrarTool()
+            GetRegistrarTool(),
+            RDAPLookupTool()
         ]
 
         # Initializing the Agent
@@ -130,7 +161,7 @@ if st.button("Generate Takedown Request 📨"):
         prompt = """
         Task:
 
-        1. Perform a WHOIS lookup to find the domain registrar for {domain}.
+        1. Use the {tool_name} tool to find the domain registrar for {domain}.
         2. Perform a web search to find the email address for takedown requests for that domain registrar.
         3. Prepare a draft email takedown request to the hosting provider citing the following reason: {reason}. Include the additional information provided: {additional_info}
         
@@ -146,9 +177,9 @@ if st.button("Generate Takedown Request 📨"):
 
         # Fill placeholders with actual data
         if custom_reason:
-            prompt_filled = prompt.format(domain=domain, reason=custom_reason, additional_info=additional_info)
+            prompt_filled = prompt.format(tool_name=tool_name, domain=domain, reason=custom_reason, additional_info=additional_info)
         else:
-            prompt_filled = prompt.format(domain=domain, reason=reason, additional_info=additional_info)
+            prompt_filled = prompt.format(tool_name=tool_name, domain=domain, reason=reason, additional_info=additional_info)
 
         try:
             with st.spinner("Processing your request... ⏳"):

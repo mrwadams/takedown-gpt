@@ -4,7 +4,7 @@ This Streamlit app helps you draft takedown requests to domain registrars.
 
 It uses a combination of autonomous LangChain Agents and OpenAI's recently introduced support for function calling to:
 
-1. Perform a WHOIS lookup to identify the registrar for the given website
+1. Perform a domain registrar lookup using either WHOIS or RDAP to identify the registrar for the given website
 2. Search the web with DuckDuckGo to find the appropriate email address for takedown requests for that domain registrar
 3. Draft a takedown request email to the hosting provider citing the reason for the takedown request
 
@@ -13,6 +13,9 @@ Created by [Matt Adams](https://www.linkedin.com/in/matthewrwadams/).
 ![TakedownGPT App Screenshot](screenshot.jpg)
 
 [Click here to try the live app!](https://takedowngpt.streamlit.app)
+
+## New Feature ✨
+The app now supports performing domain registrar lookups using either WHOIS or RDAP. You can select your preferred protocol from the "Advanced Options" menu.
 
 ## Installation
 
