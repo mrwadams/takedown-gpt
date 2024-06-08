@@ -5,3 +5,5 @@ openai==0.27.4
 pydantic
 duckduckgo-search
 whoisit
+aiohttp>=3.9.4 # not directly required, pinned by Snyk to avoid a vulnerability
+requests>=2.32.0 # not directly required, pinned by Snyk to avoid a vulnerability
