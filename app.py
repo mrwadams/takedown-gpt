@@ -5,7 +5,7 @@ import tldextract
 import whois
 import whoisit
 from langchain.agents import AgentType, Tool, initialize_agent
-from langchain.chat_models import ChatOpenAI
+from langchain_openai import ChatOpenAI
 from langchain.tools import BaseTool
 from langchain.tools.ddg_search import DuckDuckGoSearchRun
 from pydantic import BaseModel, Field
@@ -27,10 +27,14 @@ api_key = st.sidebar.text_input("Enter your OpenAI API key:", type="password", h
 
 # Add 'Model Selection' section to the sidebar
 model_options = [
-    "gpt-3.5-turbo-0613",
-    "gpt-4-0613"
+    "gpt-3.5-turbo",
+    "gpt-4o"
 ]
-selected_model = st.sidebar.selectbox("Select the OpenAI model you would like to use:", model_options, help="You must have been given access to the [GPT-4 API](https://openai.com/waitlist/gpt-4-api) by OpenAI in order to use it.")
+selected_model = st.sidebar.selectbox(
+    "Select the OpenAI model you would like to use:",
+    model_options,
+    help="Select from the latest OpenAI chat models"
+)
 
 # Add 'About' section to the sidebar
 st.sidebar.header("About 🌐")
@@ -116,8 +120,8 @@ if st.button("Generate Takedown Request 📨"):
             domain: str = Field(..., description="The domain name to look up")
 
         class GetRegistrarTool(BaseTool):
-            name = "get_registrar"
-            description = "Useful for finding the registrar of a given domain name using WHOIS"
+            name: str = "get_registrar"
+            description: str = "Useful for finding the registrar of a given domain name using WHOIS"
 
             def _run(self, domain: str):
                 w = whois.whois(domain)
@@ -130,8 +134,8 @@ if st.button("Generate Takedown Request 📨"):
 
         # Define a custom tool for RDAP lookups
         class RDAPLookupTool(BaseTool):
-            name = "rdap_lookup"
-            description = "Useful for finding the registrar of a given domain name using RDAP"
+            name: str = "rdap_lookup"
+            description: str = "Useful for finding the registrar of a given domain name using RDAP"
 
             def _run(self, domain: str):
                 whoisit.bootstrap()

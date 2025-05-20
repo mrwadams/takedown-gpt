@@ -1,9 +1,12 @@
-tldextract==3.4.1
-python-whois==0.8.0
-langchain==0.0.204
-openai==0.27.4
+tldextract
+python-whois
+langchain
+langchain-community
+langchain-openai
+openai>=1.0.0
 pydantic
 duckduckgo-search
+streamlit
 whoisit
 aiohttp>=3.10.11 # not directly required, pinned by Snyk to avoid a vulnerability
 anyio>=4.4.0 # not directly required, pinned by Snyk to avoid a vulnerability
