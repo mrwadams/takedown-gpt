@@ -120,8 +120,8 @@ if st.button("Generate Takedown Request 📨"):
             domain: str = Field(..., description="The domain name to look up")
 
         class GetRegistrarTool(BaseTool):
-            name = "get_registrar"
-            description = "Useful for finding the registrar of a given domain name using WHOIS"
+            name: str = "get_registrar"
+            description: str = "Useful for finding the registrar of a given domain name using WHOIS"
 
             def _run(self, domain: str):
                 w = whois.whois(domain)
@@ -134,8 +134,8 @@ if st.button("Generate Takedown Request 📨"):
 
         # Define a custom tool for RDAP lookups
         class RDAPLookupTool(BaseTool):
-            name = "rdap_lookup"
-            description = "Useful for finding the registrar of a given domain name using RDAP"
+            name: str = "rdap_lookup"
+            description: str = "Useful for finding the registrar of a given domain name using RDAP"
 
             def _run(self, domain: str):
                 whoisit.bootstrap()
