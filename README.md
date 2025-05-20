@@ -8,6 +8,8 @@ It uses a combination of autonomous LangChain Agents and OpenAI's recently intro
 2. Search the web with DuckDuckGo to find the appropriate email address for takedown requests for that domain registrar
 3. Draft a takedown request email to the hosting provider citing the reason for the takedown request
 
+The application now relies on the OpenAI Python SDK v1 and supports the latest chat models.
+
 Created by [Matt Adams](https://www.linkedin.com/in/matthewrwadams/).
 
 ![TakedownGPT App Screenshot](screenshot.jpg)
@@ -15,7 +17,7 @@ Created by [Matt Adams](https://www.linkedin.com/in/matthewrwadams/).
 [Click here to try the live app!](https://takedowngpt.streamlit.app)
 
 ## New Feature ✨
-The app now supports performing domain registrar lookups using either WHOIS or RDAP. You can select your preferred protocol from the "Advanced Options" menu.
+The app now supports performing domain registrar lookups using either WHOIS or RDAP. You can select your preferred protocol from the "Advanced Options" menu. It also uses the latest OpenAI Python SDK with support for the current `gpt-3.5-turbo` and `gpt-4o` models.
 
 ## Installation
 
