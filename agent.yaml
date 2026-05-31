@@ -1,0 +1,33 @@
+spec_version: "0.1.0"
+name: takedown-gpt
+version: 1.0.0
+description: >
+  TakedownGPT is a LangChain-powered AI agent that automates the discovery of
+  domain registrars and the drafting of takedown requests for malicious or
+  infringing domains. Given a domain name and a reason (copyright infringement,
+  malware, phishing, etc.), the agent performs a WHOIS or RDAP registrar lookup,
+  searches the web for the registrar's abuse/takedown contact email, and drafts
+  a professional takedown request email — all in one autonomous step.
+author: mrwadams
+license: MIT
+
+model:
+  preferred: openai:gpt-4o
+  fallback:
+    - openai:gpt-3.5-turbo
+  constraints:
+    temperature: 0.7
+
+skills:
+  - whois-rdap-lookup
+  - web-search
+  - email-drafting
+
+runtime:
+  max_turns: 10
+
+compliance:
+  risk_tier: standard
+  supervision:
+    human_in_the_loop: destructive
+    kill_switch: true
