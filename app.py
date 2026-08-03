@@ -132,11 +132,14 @@ if st.button("Generate Takedown Request 📨"):
     elif not is_valid_domain(domain):
         handle_error("Please provide a valid domain name. 🌐")
     else:
-        # Initialize ChatOpenAI. GPT-5 reasoning models only support the
-        # default temperature (passing any other value returns a 400), so
-        # omit it for them and set it explicitly for non-reasoning models.
+        # Initialize ChatOpenAI. GPT-5 reasoning models must use the Responses
+        # API to combine function tools with reasoning (the Chat Completions
+        # endpoint rejects that pairing), and they only support the default
+        # temperature. Non-reasoning models keep temperature=0.7.
         llm_kwargs = {"model": selected_model, "api_key": api_key}
-        if not selected_model.startswith("gpt-5"):
+        if selected_model.startswith("gpt-5"):
+            llm_kwargs["use_responses_api"] = True
+        else:
             llm_kwargs["temperature"] = 0.7
         llm = ChatOpenAI(**llm_kwargs)
 
@@ -182,12 +185,9 @@ if st.button("Generate Takedown Request 📨"):
                 result = open_ai_agent.invoke(
                     {"messages": [{"role": "user", "content": prompt_filled}]}
                 )
-                final_message = result["messages"][-1].content
-                response = (
-                    final_message
-                    if isinstance(final_message, str)
-                    else str(final_message)
-                )
+                # .text extracts the string from either plain or block-list
+                # content (the Responses API can return content blocks).
+                response = result["messages"][-1].text
 
             if "Email address for takedown requests: [not found]" in response:
                 handle_error("Could not find the email address for takedown requests. Please try again or manually search for the domain registrar's contact information. 🚫")
