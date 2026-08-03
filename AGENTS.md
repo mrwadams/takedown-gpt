@@ -13,7 +13,13 @@ search) to draft domain-registrar takedown emails.
   pip install -r requirements.txt
   streamlit run app.py
   ```
-- There is no automated test suite. Verify changes by running the app and generating a takedown for a real domain. A clean headless boot (`streamlit run app.py --server.headless true`) catches import/syntax errors but **not** the LLM path — that only fails on a real API call.
+- **Unit tests** cover the pure helpers in `app.py` (domain validation, LLM-kwargs routing, tool selection, reply extraction, search formatting). Install dev deps and run them:
+  ```bash
+  pip install -r requirements-dev.txt
+  python -m pytest
+  ```
+  The tests import `app` without running the UI — the Streamlit UI lives in `main()` behind `if __name__ == "__main__":`, and `streamlit run` executes the script as `__main__`, so both paths work. Keep new pure logic in module-level functions (not inside `main()`) so it stays testable.
+- The unit tests do **not** exercise the live LLM path — that only fails on a real API call. After changing the model, prompt, or agent wiring, also verify by running the app and generating a takedown for a real domain. A clean headless boot (`streamlit run app.py --server.headless true`) catches import/syntax errors but not the LLM round-trip.
 
 ## Non-obvious constraints (things that were broken and fixed — don't regress them)
 
