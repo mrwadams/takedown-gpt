@@ -24,10 +24,9 @@ api_key = st.sidebar.text_input("Enter your OpenAI API key:", type="password", h
 
 # Add 'Model Selection' section to the sidebar
 model_options = [
-    "gpt-4o-mini",
-    "gpt-4o",
-    "gpt-4.1-mini",
-    "gpt-4.1"
+    "gpt-5.6-luna",
+    "gpt-5.6-terra",
+    "gpt-5.6-sol"
 ]
 selected_model = st.sidebar.selectbox(
     "Select the OpenAI model you would like to use:",
@@ -133,8 +132,13 @@ if st.button("Generate Takedown Request 📨"):
     elif not is_valid_domain(domain):
         handle_error("Please provide a valid domain name. 🌐")
     else:
-        # Initialize ChatOpenAI
-        llm = ChatOpenAI(temperature=0.7, model=selected_model, api_key=api_key)
+        # Initialize ChatOpenAI. GPT-5 reasoning models only support the
+        # default temperature (passing any other value returns a 400), so
+        # omit it for them and set it explicitly for non-reasoning models.
+        llm_kwargs = {"model": selected_model, "api_key": api_key}
+        if not selected_model.startswith("gpt-5"):
+            llm_kwargs["temperature"] = 0.7
+        llm = ChatOpenAI(**llm_kwargs)
 
         # Select the registrar-lookup tool for the chosen protocol, alongside search
         lookup_tool = rdap_lookup if selected_lookup == "RDAP" else get_registrar
