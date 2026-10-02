@@ -1,3 +1,6 @@
+import json
+
+import requests
 import streamlit as st
 import tldextract
 import whois
@@ -32,6 +35,12 @@ lookup_options = [
     "RDAP"
 ]
 
+# Backend options for the agent's web search tool
+search_options = [
+    "DuckDuckGo",
+    "You.com"
+]
+
 # Marker the model is instructed to emit when it cannot find a takedown email
 NOT_FOUND_MARKER = "Email address for takedown requests: [not found]"
 
@@ -40,7 +49,7 @@ PROMPT_TEMPLATE = """
 Task:
 
 1. Use the {tool_name} tool to find the domain registrar for {domain}.
-2. Use the web_search tool to find the email address for takedown requests for that domain registrar.
+2. Use the {search_tool_name} tool to find the email address for takedown requests for that domain registrar.
 3. Prepare a draft email takedown request to the hosting provider citing the following reason: {reason}. Include the additional information provided: {additional_info}
 
 Your response must be in the following format and should not include any other information:
@@ -88,6 +97,123 @@ def web_search(query: str) -> str:
     )
 
 
+# Optional You.com backend: the free MCP profile is keyless, like DuckDuckGo,
+# so switching backends needs no API key or account.
+YOUCOM_MCP_URL = "https://api.you.com/mcp?profile=free"
+YOUCOM_MCP_HEADERS = {"Accept": "application/json, text/event-stream"}
+
+
+def mcp_result(response_text):
+    """Return the JSON-RPC tool-call result from a streamable-HTTP reply.
+
+    The You.com MCP endpoint answers with `text/event-stream`, so one response
+    can carry several frames (progress notifications plus the result).
+    Notification frames carry a `method`; the result frame is the one that
+    carries `result` (the server omits the request id on result frames).
+    Frames end at LF/CRLF only — other Unicode line-separator code points can
+    appear inside JSON strings and must not split a frame.
+    """
+    for line in response_text.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
+        if not line.startswith("data:"):
+            continue
+        try:
+            message = json.loads(line[len("data:"):].strip())
+        except json.JSONDecodeError:
+            continue
+        if message.get("method"):
+            continue  # a notification, not the result
+        if "error" in message:
+            raise RuntimeError(message["error"].get("message", "MCP request failed"))
+        if "result" in message:
+            return message["result"]
+    raise RuntimeError("MCP response did not contain a result")
+
+
+def youcom_search(query):
+    """Search the web with You.com's keyless MCP server and return its web results.
+
+    Performs the streamable-HTTP MCP handshake (initialize → initialized →
+    tools/call) and keeps the Mcp-Session-Id when the server issues one.
+    """
+    init = requests.post(
+        YOUCOM_MCP_URL,
+        json={
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2025-06-18",
+                "capabilities": {},
+                "clientInfo": {"name": "takedown-gpt", "version": "1.0"},
+            },
+        },
+        headers=YOUCOM_MCP_HEADERS,
+        timeout=30,
+    )
+    init.raise_for_status()
+    session_id = init.headers.get("Mcp-Session-Id")
+
+    def mcp_post(payload):
+        headers = dict(YOUCOM_MCP_HEADERS)
+        if session_id:
+            headers["Mcp-Session-Id"] = session_id
+        response = requests.post(
+            YOUCOM_MCP_URL, json=payload, headers=headers, timeout=30
+        )
+        response.raise_for_status()
+        return response
+
+    mcp_post({"jsonrpc": "2.0", "method": "notifications/initialized"})
+    call = mcp_post(
+        {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/call",
+            "params": {
+                "name": "you-search",
+                "arguments": {"query": query, "count": 5},
+            },
+        }
+    )
+    result = mcp_result(call.content.decode("utf-8"))  # SSE bodies are UTF-8;
+    # without a charset on text/event-stream, requests would decode as
+    # ISO-8859-1 and mangle non-ASCII results.
+    text = next(
+        (block.get("text", "") for block in result.get("content", [])
+         if block.get("type") == "text"),
+        "",
+    )
+    if not text:
+        raise RuntimeError("you-search returned no text content")
+    if result.get("isError"):
+        raise RuntimeError(text)
+    try:
+        return json.loads(text).get("results", {}).get("web", [])
+    except json.JSONDecodeError as error:
+        raise RuntimeError(f"unexpected you-search payload: {error}") from error
+
+
+def format_youcom_results(results):
+    """Format You.com web results the same way web_search formats DuckDuckGo rows."""
+    if not results:
+        return "No results found."
+    return "\n\n".join(
+        f"{r.get('title', '')}\n{r.get('url', '')}\n{r.get('description', '')}"
+        for r in results
+    )
+
+
+@tool
+def youcom_web_search(query: str) -> str:
+    """Search the web for information with You.com. Ask targeted questions; useful
+    for finding a domain registrar's abuse or takedown-request contact email address."""
+    try:
+        results = youcom_search(query)
+    except (requests.RequestException, RuntimeError, ValueError) as error:
+        return f"You.com search failed: {error}"
+    return format_youcom_results(results)
+
+
 def is_valid_domain(domain):
     """Return True only when the input has both a registrable domain and a public suffix."""
     extracted = tldextract.extract(domain)
@@ -117,6 +243,13 @@ def select_lookup_tool(selected_lookup):
     if selected_lookup == "RDAP":
         return rdap_lookup, "rdap_lookup"
     return get_registrar, "get_registrar"
+
+
+def select_search_tool(selected_search):
+    """Map the chosen web search backend to its (tool, prompt_name) pair, kept in lock-step."""
+    if selected_search == "You.com":
+        return youcom_web_search, "youcom_web_search"
+    return web_search, "web_search"
 
 
 def extract_reply(result):
@@ -166,7 +299,7 @@ def main():
     This app helps you draft takedown requests to domain registrars.
     It uses a combination of autonomous LangChain Agents and OpenAI's recently introduced support for function calling to:
       1. Perform a WHOIS / RDAP lookup to identify the registrar for the given website
-      2. Search the web with DuckDuckGo to find the appropriate email address for takedown requests for that domain registrar
+      2. Search the web with DuckDuckGo (default) or You.com to find the appropriate email address for takedown requests for that domain registrar
       3. Draft a takedown request email to the hosting provider citing the reason for the takedown request
 
     Created by [Matt Adams](https://www.linkedin.com/in/matthewrwadams/).
@@ -189,6 +322,7 @@ def main():
     # Advanced Options collapsible menu
     advanced_options = st.expander("Advanced Options ⚙️")
     selected_lookup = advanced_options.selectbox("Select your preferred protocol for domain registrar lookups:", lookup_options)
+    selected_search = advanced_options.selectbox("Select your preferred web search backend:", search_options, help="DuckDuckGo is the default. You.com also needs no API key — it runs through You.com's free MCP profile (~100 searches/day).")
 
     if st.button("Generate Takedown Request 📨"):
         if not api_key:
@@ -202,7 +336,8 @@ def main():
 
             # Select the registrar-lookup tool for the chosen protocol, alongside search
             lookup_tool, tool_name = select_lookup_tool(selected_lookup)
-            tools = [lookup_tool, web_search]
+            search_tool, search_tool_name = select_search_tool(selected_search)
+            tools = [lookup_tool, search_tool]
 
             # Build the agent (LangChain 1.x create_agent runs a tool-calling loop)
             open_ai_agent = create_agent(llm, tools=tools, system_prompt=SYSTEM_PROMPT)
@@ -210,6 +345,7 @@ def main():
             # Fill placeholders with actual data
             prompt_filled = PROMPT_TEMPLATE.format(
                 tool_name=tool_name,
+                search_tool_name=search_tool_name,
                 domain=domain,
                 reason=custom_reason if custom_reason else reason,
                 additional_info=additional_info,

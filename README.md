@@ -5,10 +5,10 @@ This Streamlit app helps you draft takedown requests to domain registrars.
 It uses a LangChain agent that calls tools in a loop to:
 
 1. Perform a domain registrar lookup using either WHOIS or RDAP to identify the registrar for the given website
-2. Search the web with DuckDuckGo to find the appropriate email address for takedown requests for that domain registrar
+2. Search the web with DuckDuckGo (default) or You.com to find the appropriate email address for takedown requests for that domain registrar
 3. Draft a takedown request email to the registrar citing the reason for the takedown request
 
-You can choose your preferred lookup protocol (WHOIS or RDAP) from the "Advanced Options" menu.
+You can choose your preferred lookup protocol (WHOIS or RDAP) and web search backend (DuckDuckGo or You.com) from the "Advanced Options" menu.
 
 The app runs on OpenAI's GPT-5.6 models — `gpt-5.6-luna` (fast, low cost), `gpt-5.6-terra` (balanced), and `gpt-5.6-sol` (flagship) — which are driven through OpenAI's Responses API so the agent's tool calling works with these reasoning models.
 
@@ -56,7 +56,12 @@ streamlit run app.py
 4. Click the 'Generate Takedown Request' button to create the draft email and find the appropriate email address for the takedown request.
 5. Copy or download the draft email and send it to the appropriate email address.
 
+### Web search backend
+
+DuckDuckGo is the default web search backend and requires no setup. From the "Advanced Options" menu you can switch the agent's web search to **You.com**, which also works without an API key or account: it calls You.com's free MCP profile (`https://api.you.com/mcp?profile=free`), which allows roughly 100 searches per day. If the daily quota is exhausted, switch the backend back to DuckDuckGo or retry later.
+
 ## Troubleshooting
 
 - **`ModuleNotFoundError: No module named 'tldextract'` (or another dependency)** — Streamlit is running from an environment that doesn't have the requirements installed. Activate the virtual environment first (`source .venv/bin/activate`), or run `pip install -r requirements.txt` in whichever environment you launch `streamlit` from.
 - **`Error code: 401 - invalid_api_key`** — the key entered in the sidebar isn't a valid OpenAI key. Keys start with `sk-` (or `sk-proj-`); check for a truncated paste or stray whitespace, and confirm the key is active with available quota.
+- **`You.com search failed: ...`** — the You.com backend needs internet access and uses You.com's free MCP profile, which allows roughly 100 searches per day. Retry later, or switch the web search backend back to DuckDuckGo in "Advanced Options".
